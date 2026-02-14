@@ -16,19 +16,13 @@ CHALLENGE_POOL = ["blink", "turn_left", "turn_right", "smile", "brow_raise", "to
 
 
 def generate_challenge_steps(count: int = 3) -> List[str]:
-    """Generate a random sequence of challenge steps.
+    """Generate a random sequence of unique challenge steps.
     
-    Ensures no duplicate consecutive actions and returns
-    a list of `count` randomly selected gestures.
+    Returns a list of `count` randomly selected unique gestures.
     """
-    steps = []
-    available = CHALLENGE_POOL.copy()
-    for _ in range(count):
-        choice = random.choice(available)
-        steps.append(choice)
-        # Prevent same action twice in a row
-        available = [a for a in CHALLENGE_POOL if a != choice]
-    return steps
+    if count > len(CHALLENGE_POOL):
+        count = len(CHALLENGE_POOL)
+    return random.sample(CHALLENGE_POOL, count)
 
 
 async def create_challenge(db: AsyncSession) -> Challenge:
