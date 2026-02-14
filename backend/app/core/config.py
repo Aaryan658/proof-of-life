@@ -1,12 +1,21 @@
 """Application configuration via environment variables."""
 
 from pydantic_settings import BaseSettings
+from pydantic import field_validator
 from functools import lru_cache
 
 
 class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/proof_of_life"
+
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def fix_db_scheme(cls, v: str) -> str:
+        """Railway gives postgresql:// – SQLAlchemy async needs postgresql+asyncpg://"""
+        if v.startswith("postgresql://"):
+            v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return v
 
     # JWT
     JWT_SECRET: str = "super-secret-change-me-in-production"
