@@ -12,7 +12,7 @@ from app.models.models import Challenge
 settings = get_settings()
 
 # Available challenge actions
-CHALLENGE_POOL = ["blink", "turn_left", "turn_right", "smile"]
+CHALLENGE_POOL = ["blink", "turn_left", "turn_right", "smile", "brow_raise", "tongue_out"]
 
 
 def generate_challenge_steps(count: int = 3) -> List[str]:

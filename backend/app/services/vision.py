@@ -1,6 +1,6 @@
 """Computer-vision pipeline for liveness detection using MediaPipe Face Mesh.
 
-Detects: blink (EAR), smile (lip ratio), head turn left/right (nose offset).
+Detects: blink (EAR), smile (lip ratio), head turn left/right (nose offset), brow raise, mouth open.
 Enforces temporal ordering of challenge steps across sequential frames.
 """
 
@@ -49,6 +49,16 @@ LEFT_LIP_IDX = [61]
 RIGHT_LIP_IDX = [291]
 NOSE_TIP_IDX = 1
 
+# Brow raise landmarks (Mid-brow vs Mid-eye)
+LEFT_BROW_IDX = 105
+RIGHT_BROW_IDX = 334
+LEFT_EYE_TOP_IDX = 159
+RIGHT_EYE_TOP_IDX = 386
+
+# Eye width for normalization
+LEFT_EYE_WIDTH_IDX1 = 33
+LEFT_EYE_WIDTH_IDX2 = 133
+
 
 def _dist(a, b):
     return math.hypot(a.x - b.x, a.y - b.y)
@@ -68,6 +78,21 @@ def _smile_ratio(lm):
     w = _dist(lm[LEFT_LIP_IDX[0]], lm[RIGHT_LIP_IDX[0]])
     h = _dist(lm[UPPER_LIP_IDX[0]], lm[LOWER_LIP_IDX[0]])
     return w / (h + 1e-6)
+
+
+def _mouth_open_ratio(lm):
+    """Height / Width of mouth – high value ≈ mouth open."""
+    w = _dist(lm[LEFT_LIP_IDX[0]], lm[RIGHT_LIP_IDX[0]])
+    h = _dist(lm[UPPER_LIP_IDX[0]], lm[LOWER_LIP_IDX[0]])
+    return h / (w + 1e-6)
+
+
+def _brow_raise_ratio(lm):
+    """Distance between brow and eye, normalized by eye width."""
+    left_dist = _dist(lm[LEFT_BROW_IDX], lm[LEFT_EYE_TOP_IDX])
+    right_dist = _dist(lm[RIGHT_BROW_IDX], lm[RIGHT_EYE_TOP_IDX])
+    eye_width = _dist(lm[LEFT_EYE_WIDTH_IDX1], lm[LEFT_EYE_WIDTH_IDX2])
+    return (left_dist + right_dist) / (2.0 * eye_width + 1e-6)
 
 
 def _nose_offset(lm):
@@ -137,6 +162,23 @@ def detect_action(landmarks, action: str) -> tuple:
         detected = nx < threshold
         confidence = min(1.0, (0.5 - nx) * 4) if detected else 0.0
         return detected, round(max(confidence, 0.0), 3)
+
+    if action == "brow_raise":
+        ratio = _brow_raise_ratio(lm)
+        # Threshold: > 0.35 usually indicates raised brows
+        threshold = 0.35
+        detected = ratio > threshold
+        confidence = min(1.0, ratio / (threshold * 1.4)) if detected else 0.0
+        return detected, round(confidence, 3)
+
+    if action == "tongue_out":
+        # Proxy: Mouth Open Wide
+        ratio = _mouth_open_ratio(lm)
+        # Threshold: > 0.5 indicates significant vertical opening
+        threshold = 0.5
+        detected = ratio > threshold
+        confidence = min(1.0, ratio / (threshold * 1.5)) if detected else 0.0
+        return detected, round(confidence, 3)
 
     return False, 0.0
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Eye, ArrowLeft, ArrowRight, Smile, CheckCircle2, Circle, Loader2 } from "lucide-react";
+import { Eye, ArrowLeft, ArrowRight, Smile, CheckCircle2, Circle, Loader2, ChevronsUp, Megaphone } from "lucide-react";
 
 interface ChallengeStep {
     step: string;
@@ -36,6 +36,16 @@ const STEP_CONFIG: Record<string, { icon: React.ElementType; label: string; inst
         icon: Smile,
         label: "Smile",
         instruction: "Give a natural smile",
+    },
+    brow_raise: {
+        icon: ChevronsUp,
+        label: "Raise Eyebrows",
+        instruction: "Raise your eyebrows high",
+    },
+    tongue_out: {
+        icon: Megaphone,
+        label: "Show Tongue",
+        instruction: "Open mouth wide or stick out tongue",
     },
 };
 
