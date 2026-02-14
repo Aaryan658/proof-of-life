@@ -151,22 +151,24 @@ def detect_action(landmarks, action: str) -> tuple:
 
     if action == "turn_left":
         nx = _nose_offset(lm)
-        threshold = getattr(settings, "HEAD_TURN_THRESHOLD", 0.58)
+        # Relaxed from 0.58 to 0.55
+        threshold = getattr(settings, "HEAD_TURN_THRESHOLD", 0.55)
         detected = nx > threshold
         confidence = min(1.0, (nx - 0.5) * 4) if detected else 0.0
         return detected, round(max(confidence, 0.0), 3)
 
     if action == "turn_right":
         nx = _nose_offset(lm)
-        threshold = 1.0 - getattr(settings, "HEAD_TURN_THRESHOLD", 0.58)
+        # Relaxed from 0.58 to 0.55
+        threshold = 1.0 - getattr(settings, "HEAD_TURN_THRESHOLD", 0.55)
         detected = nx < threshold
         confidence = min(1.0, (0.5 - nx) * 4) if detected else 0.0
         return detected, round(max(confidence, 0.0), 3)
 
     if action == "brow_raise":
         ratio = _brow_raise_ratio(lm)
-        # Threshold: > 0.35 usually indicates raised brows
-        threshold = 0.35
+        # Relaxed from 0.35 to 0.28 to accommodate different brow shapes
+        threshold = 0.28
         detected = ratio > threshold
         confidence = min(1.0, ratio / (threshold * 1.4)) if detected else 0.0
         return detected, round(confidence, 3)
@@ -174,8 +176,8 @@ def detect_action(landmarks, action: str) -> tuple:
     if action == "tongue_out":
         # Proxy: Mouth Open Wide
         ratio = _mouth_open_ratio(lm)
-        # Threshold: > 0.5 indicates significant vertical opening
-        threshold = 0.5
+        # Relaxed from 0.5 to 0.35 to make it easier
+        threshold = 0.35
         detected = ratio > threshold
         confidence = min(1.0, ratio / (threshold * 1.5)) if detected else 0.0
         return detected, round(confidence, 3)
