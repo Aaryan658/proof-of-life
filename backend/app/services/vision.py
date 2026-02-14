@@ -249,15 +249,31 @@ def analyze_frames(
         if step_results[i]["detected"] and step_results[i + 1]["detected"]
     ) if steps_passed > 1 else steps_passed > 0
 
-    step_score = (steps_passed / total_steps) * 60 if total_steps else 0
-    face_ratio = (face_detected_count / total_frames) * 20
-    avg_conf = (
-        sum(s["confidence"] for s in step_results if s["detected"])
-        / max(steps_passed, 1)
-    ) * 20
-    liveness_score = round(min(100.0, step_score + face_ratio + avg_conf), 1)
+    
+    # Scoring Logic (Hackathon Optimized)
+    # If passed checks, we want a high score (90-100).
+    # If failed, we scale based on progress.
+    
+    checks_passed = (steps_passed == total_steps) and temporal_valid
+    
+    if checks_passed:
+        # Base 90 for passing
+        # + up to 5 points for face detection stability
+        # + up to 5 points for gesture confidence
+        stability_bonus = (face_detected_count / total_frames) * 5
+        confidence_bonus = (sum(s["confidence"] for s in step_results) / total_steps) * 5
+        liveness_score = round(min(100.0, 90.0 + stability_bonus + confidence_bonus), 1)
+    else:
+        # Standard progress-based scoring for failures
+        step_score = (steps_passed / total_steps) * 60 if total_steps else 0
+        face_ratio = (face_detected_count / total_frames) * 20
+        avg_conf = (
+            sum(s["confidence"] for s in step_results if s["detected"])
+            / max(steps_passed, 1)
+        ) * 20
+        liveness_score = round(min(100.0, step_score + face_ratio + avg_conf), 1)
 
-    passed = steps_passed == total_steps and temporal_valid and liveness_score >= 60.0
+    passed = checks_passed and liveness_score >= 60.0
 
     return {
         "passed": passed,
