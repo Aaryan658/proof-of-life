@@ -10,6 +10,7 @@ from typing import List, Dict, Any, Optional
 
 import cv2
 import mediapipe as mp
+import mediapipe.solutions.face_mesh as mp_face_mesh
 import numpy as np
 
 from app.core.config import get_settings
@@ -19,14 +20,14 @@ settings = get_settings()
 
 # ──────────────────────────── MediaPipe Setup ────────────────────────────
 
-_face_mesh: Optional[mp.solutions.face_mesh.FaceMesh] = None
+_face_mesh: Optional[mp_face_mesh.FaceMesh] = None
 
 
 def get_face_mesh():
     """Lazy singleton for MediaPipe Face Mesh."""
     global _face_mesh
     if _face_mesh is None:
-        _face_mesh = mp.solutions.face_mesh.FaceMesh(
+        _face_mesh = mp_face_mesh.FaceMesh(
             static_image_mode=True,
             max_num_faces=1,
             refine_landmarks=True,
