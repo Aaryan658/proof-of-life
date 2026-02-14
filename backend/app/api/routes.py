@@ -1,5 +1,6 @@
 """API routes for the Proof-of-Life verification system."""
 
+import asyncio
 from datetime import datetime, timezone
 from typing import List, Optional
 
@@ -138,8 +139,8 @@ async def verify_liveness(
     # 2. Mark challenge as used (one-time use - replay protection)
     challenge.used = True
 
-    # 3. Run CV pipeline
-    cv_result = analyze_frames(body.frames, challenge.steps)
+    # 3. Run CV pipeline (CPU-bound → run in thread pool to avoid blocking)
+    cv_result = await asyncio.to_thread(analyze_frames, body.frames, challenge.steps)
 
     # 4. Store verification attempt
     attempt = VerificationAttempt(
