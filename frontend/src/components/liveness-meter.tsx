@@ -19,10 +19,10 @@ export default function LivenessMeter({
     const offset = circumference - progress;
 
     const getColor = () => {
-        if (score >= 80) return { stroke: "#10b981", bg: "rgba(16,185,129,0.1)", label: "HIGH" };
-        if (score >= 60) return { stroke: "#f59e0b", bg: "rgba(245,158,11,0.1)", label: "MEDIUM" };
-        if (score > 0) return { stroke: "#ef4444", bg: "rgba(239,68,68,0.1)", label: "LOW" };
-        return { stroke: "#3f3f5a", bg: "transparent", label: "—" };
+        if (score >= 80) return { stroke: "#27ae60", bg: "rgba(39,174,96,0.1)", label: "HIGH" };
+        if (score >= 60) return { stroke: "#d4a847", bg: "rgba(212,168,71,0.1)", label: "MEDIUM" };
+        if (score > 0) return { stroke: "#e74c3c", bg: "rgba(231,76,60,0.1)", label: "LOW" };
+        return { stroke: "#1a4d36", bg: "transparent", label: "—" };
     };
 
     const color = getColor();
@@ -42,7 +42,7 @@ export default function LivenessMeter({
                         cy={size / 2}
                         r={radius}
                         fill="none"
-                        stroke="rgba(30,30,58,0.8)"
+                        stroke="rgba(26,77,54,0.6)"
                         strokeWidth="8"
                     />
                     {/* Progress circle */}

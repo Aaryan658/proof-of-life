@@ -4,7 +4,7 @@ import { useRef, useEffect, useCallback, useState } from "react";
 
 interface WebcamFeedProps {
     onFrame?: (base64: string) => void;
-    captureInterval?: number; // ms between captures
+    captureInterval?: number;
     isCapturing?: boolean;
     className?: string;
 }
@@ -21,7 +21,6 @@ export default function WebcamFeed({
     const [isReady, setIsReady] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Start camera
     useEffect(() => {
         let mounted = true;
 
@@ -69,13 +68,12 @@ export default function WebcamFeed({
         };
     }, []);
 
-    // Capture frames
     const captureFrame = useCallback(() => {
         if (!videoRef.current || !canvasRef.current) return null;
 
         const video = videoRef.current;
         const canvas = canvasRef.current;
-        canvas.width = 320; // Downscaled for performance
+        canvas.width = 320;
         canvas.height = Math.round((320 / video.videoWidth) * video.videoHeight) || 240;
 
         const ctx = canvas.getContext("2d");
@@ -85,7 +83,6 @@ export default function WebcamFeed({
         return canvas.toDataURL("image/jpeg", 0.7);
     }, []);
 
-    // Auto-capture interval
     useEffect(() => {
         if (!isCapturing || !isReady || !onFrame) return;
 
@@ -99,10 +96,10 @@ export default function WebcamFeed({
 
     if (error) {
         return (
-            <div className={`relative flex items-center justify-center rounded-2xl bg-[var(--card)] border border-red-500/30 ${className}`}>
+            <div className={`relative flex items-center justify-center rounded-2xl bg-[var(--card)] border border-[rgba(231,76,60,0.3)] ${className}`}>
                 <div className="text-center p-6">
                     <div className="text-4xl mb-3">📷</div>
-                    <p className="text-red-400 text-sm font-medium">{error}</p>
+                    <p className="text-[#e74c3c] text-sm font-medium">{error}</p>
                 </div>
             </div>
         );
@@ -110,7 +107,6 @@ export default function WebcamFeed({
 
     return (
         <div className={`relative overflow-hidden rounded-2xl ${className}`}>
-            {/* Video feed */}
             <video
                 ref={videoRef}
                 autoPlay
@@ -119,22 +115,21 @@ export default function WebcamFeed({
                 className="w-full h-full object-cover transform -scale-x-100"
             />
 
-            {/* Hidden canvas for frame capture */}
             <canvas ref={canvasRef} className="hidden" />
 
-            {/* Scan line overlay when capturing */}
+            {/* Scan overlay when capturing */}
             {isCapturing && (
                 <div className="webcam-scan absolute inset-0 pointer-events-none">
-                    <div className="absolute inset-0 border-2 border-[var(--primary)] rounded-2xl opacity-60" />
+                    <div className="absolute inset-0 border-2 border-[var(--primary)] rounded-2xl opacity-50" />
                     {/* Corner brackets */}
-                    <div className="absolute top-3 left-3 w-6 h-6 border-t-2 border-l-2 border-[var(--cyan)] rounded-tl-md" />
-                    <div className="absolute top-3 right-3 w-6 h-6 border-t-2 border-r-2 border-[var(--cyan)] rounded-tr-md" />
-                    <div className="absolute bottom-3 left-3 w-6 h-6 border-b-2 border-l-2 border-[var(--cyan)] rounded-bl-md" />
-                    <div className="absolute bottom-3 right-3 w-6 h-6 border-b-2 border-r-2 border-[var(--cyan)] rounded-br-md" />
+                    <div className="absolute top-3 left-3 w-8 h-8 border-t-2 border-l-2 border-[var(--gold)] rounded-tl-lg" />
+                    <div className="absolute top-3 right-3 w-8 h-8 border-t-2 border-r-2 border-[var(--gold)] rounded-tr-lg" />
+                    <div className="absolute bottom-3 left-3 w-8 h-8 border-b-2 border-l-2 border-[var(--gold)] rounded-bl-lg" />
+                    <div className="absolute bottom-3 right-3 w-8 h-8 border-b-2 border-r-2 border-[var(--gold)] rounded-br-lg" />
                 </div>
             )}
 
-            {/* Loading state */}
+            {/* Loading */}
             {!isReady && !error && (
                 <div className="absolute inset-0 flex items-center justify-center bg-[var(--card)]">
                     <div className="text-center">
@@ -147,9 +142,9 @@ export default function WebcamFeed({
             {/* Recording indicator */}
             {isCapturing && isReady && (
                 <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10">
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-500/20 border border-red-500/40 backdrop-blur-sm">
-                        <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                        <span className="text-xs font-mono text-red-400 font-semibold tracking-wider">ANALYZING</span>
+                    <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-[rgba(231,76,60,0.15)] border border-[rgba(231,76,60,0.3)] backdrop-blur-sm">
+                        <div className="w-2 h-2 bg-[#e74c3c] rounded-full animate-pulse" />
+                        <span className="text-xs font-mono text-[#e74c3c] font-semibold tracking-wider">ANALYZING</span>
                     </div>
                 </div>
             )}

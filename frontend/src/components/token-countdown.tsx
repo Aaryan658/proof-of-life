@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { Clock, ShieldCheck, ShieldAlert } from "lucide-react";
 
 interface TokenCountdownProps {
-    expiresAt: string; // ISO timestamp
+    expiresAt: string;
     className?: string;
 }
 
@@ -40,7 +40,7 @@ export default function TokenCountdown({ expiresAt, className = "" }: TokenCount
     const circumference = 2 * Math.PI * radius;
     const offset = circumference - progress * circumference;
 
-    const color = isExpired ? "#ef4444" : isWarning ? "#f59e0b" : "#10b981";
+    const color = isExpired ? "#e74c3c" : isWarning ? "#d4a847" : "#27ae60";
 
     return (
         <div className={`flex flex-col items-center gap-3 ${className}`}>
@@ -56,7 +56,7 @@ export default function TokenCountdown({ expiresAt, className = "" }: TokenCount
                         cy={size / 2}
                         r={radius}
                         fill="none"
-                        stroke="rgba(30,30,58,0.8)"
+                        stroke="rgba(26,77,54,0.6)"
                         strokeWidth="6"
                     />
                     <motion.circle
@@ -75,7 +75,7 @@ export default function TokenCountdown({ expiresAt, className = "" }: TokenCount
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
                     {isExpired ? (
-                        <ShieldAlert size={24} className="text-red-400" />
+                        <ShieldAlert size={24} className="text-[#e74c3c]" />
                     ) : (
                         <>
                             <span className="text-2xl font-bold font-mono" style={{ color }}>

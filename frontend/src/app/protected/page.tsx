@@ -45,18 +45,18 @@ export default function ProtectedPage() {
     }, []);
 
     return (
-        <div className="min-h-screen bg-[var(--background)] bg-grid relative flex items-center justify-center">
+        <div className="min-h-screen bg-emerald-gradient relative flex items-center justify-center leaf-pattern">
             <div className="bg-radial-glow absolute inset-0 pointer-events-none" />
 
-            {/* Floating orbs */}
-            <div className="absolute top-40 right-20 w-64 h-64 bg-[var(--success)] rounded-full blur-[100px] opacity-10 animate-float" />
-            <div className="absolute bottom-40 left-20 w-80 h-80 bg-[var(--primary)] rounded-full blur-[120px] opacity-8 animate-float" style={{ animationDelay: "2s" }} />
+            {/* Decorative blurs */}
+            <div className="absolute top-40 right-20 w-64 h-64 bg-[#27ae60] rounded-full blur-[120px] opacity-[0.06] animate-float" />
+            <div className="absolute bottom-40 left-20 w-80 h-80 bg-[#d4a847] rounded-full blur-[140px] opacity-[0.04] animate-float" style={{ animationDelay: "2s" }} />
 
             <div className="relative z-10 w-full max-w-lg mx-auto px-6">
                 {/* Back button */}
                 <button
                     onClick={() => router.push("/")}
-                    className="flex items-center gap-2 text-[var(--muted-foreground)] hover:text-white transition-colors mb-8"
+                    className="flex items-center gap-2 text-[var(--muted-foreground)] hover:text-[var(--primary)] transition-colors mb-8"
                 >
                     <ArrowLeft size={18} />
                     <span className="text-sm font-medium">Home</span>
@@ -86,7 +86,6 @@ export default function ProtectedPage() {
                             exit={{ opacity: 0 }}
                             className="space-y-5"
                         >
-                            {/* Success header */}
                             <div className="glass-card p-8 text-center glow-success">
                                 <motion.div
                                     initial={{ scale: 0 }}
@@ -95,25 +94,24 @@ export default function ProtectedPage() {
                                 >
                                     <ShieldCheck size={56} className="text-[var(--success)] mx-auto mb-4" />
                                 </motion.div>
-                                <h1 className="text-2xl font-bold text-[var(--success)] mb-2">Access Granted</h1>
+                                <h1 className="heading-serif text-2xl text-[var(--success)] mb-2">Access Granted</h1>
                                 <p className="text-sm text-[var(--muted-foreground)]">{data.message}</p>
                             </div>
 
-                            {/* Token info */}
                             <div className="glass-card p-6 space-y-4">
-                                <h3 className="text-sm font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">
+                                <h3 className="heading-serif text-sm text-[var(--muted-foreground)]">
                                     Token Details
                                 </h3>
                                 <div className="space-y-3">
                                     <div className="flex items-center gap-3 text-sm">
                                         <User size={16} className="text-[var(--primary)] shrink-0" />
                                         <span className="text-[var(--muted-foreground)]">Subject:</span>
-                                        <span className="font-mono text-xs ml-auto truncate max-w-[200px]">{data.user}</span>
+                                        <span className="font-mono text-xs ml-auto truncate max-w-[200px] text-[var(--cream)]">{data.user}</span>
                                     </div>
                                     <div className="flex items-center gap-3 text-sm">
-                                        <Clock size={16} className="text-[var(--cyan)] shrink-0" />
+                                        <Clock size={16} className="text-[var(--gold)] shrink-0" />
                                         <span className="text-[var(--muted-foreground)]">Issued:</span>
-                                        <span className="font-mono text-xs ml-auto">
+                                        <span className="font-mono text-xs ml-auto text-[var(--cream)]">
                                             {new Date(data.token_issued_at).toLocaleTimeString()}
                                         </span>
                                     </div>
@@ -125,20 +123,18 @@ export default function ProtectedPage() {
                                 </div>
                             </div>
 
-                            {/* Countdown */}
                             {tokenExpires && (
                                 <div className="glass-card p-6">
                                     <TokenCountdown expiresAt={tokenExpires} />
                                 </div>
                             )}
 
-                            {/* Protected content demo */}
                             <div className="glass-card p-6">
                                 <div className="flex items-center gap-2 mb-4">
                                     <Lock size={16} className="text-[var(--primary)]" />
-                                    <h3 className="text-sm font-semibold">Protected Resource</h3>
+                                    <h3 className="heading-serif text-sm text-[var(--cream)]">Protected Resource</h3>
                                 </div>
-                                <div className="p-4 rounded-xl bg-[rgba(99,102,241,0.08)] border border-[rgba(99,102,241,0.15)]">
+                                <div className="p-4 rounded-2xl bg-[rgba(46,204,113,0.06)] border border-[rgba(46,204,113,0.15)]">
                                     <p className="text-sm text-[var(--muted-foreground)] leading-relaxed">
                                         🎉 This content is only accessible to verified live humans.
                                         Your identity has been confirmed through multi-factor liveness detection.
@@ -166,13 +162,13 @@ export default function ProtectedPage() {
                         >
                             <div className="glass-card p-8 text-center glow-danger">
                                 <ShieldAlert size={56} className="text-[var(--danger)] mx-auto mb-4" />
-                                <h1 className="text-2xl font-bold text-[var(--danger)] mb-2">Access Denied</h1>
+                                <h1 className="heading-serif text-2xl text-[var(--danger)] mb-2">Access Denied</h1>
                                 <p className="text-sm text-[var(--muted-foreground)]">{error}</p>
                             </div>
 
                             <div className="glass-card p-5">
                                 <div className="flex items-start gap-3">
-                                    <AlertTriangle size={18} className="text-[var(--warning)] shrink-0 mt-0.5" />
+                                    <AlertTriangle size={18} className="text-[var(--gold)] shrink-0 mt-0.5" />
                                     <p className="text-xs text-[var(--muted-foreground)] leading-relaxed">
                                         Access to this resource requires a valid, unexpired JWT token issued
                                         through the liveness verification process. Tokens are single-use and
