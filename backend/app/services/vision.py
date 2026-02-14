@@ -1,188 +1,85 @@
-"""Computer Vision pipeline for liveness detection using pure OpenCV.
+"""Computer-vision pipeline for liveness detection using MediaPipe Face Mesh.
 
-Detects: blink (eye aspect ratio via Haar cascades), smile (mouth cascade),
-head turn left/right (face position offset).
+Detects: blink (EAR), smile (lip ratio), head turn left/right (nose offset).
 Enforces temporal ordering of challenge steps across sequential frames.
-
-Uses OpenCV's pre-trained Haar cascades and DNN face detector for
-maximum deployment compatibility (no mediapipe dependency).
 """
 
 import base64
 import logging
-import os
+import math
 from typing import List, Dict, Any, Optional
 
 import cv2
 import numpy as np
+
+# Explicit sub-module imports so Railway's venv resolves them correctly
+import mediapipe.python.solutions.face_mesh as mp_face_mesh
 
 from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-# ──────────────────────────── OpenCV Setup ────────────────────────────
+# ──────────────────────────── MediaPipe Setup ────────────────────────────
 
-# Haar cascade paths (bundled with opencv-python-headless)
-_CASCADE_DIR = os.path.join(
-    os.path.dirname(cv2.__file__), "data"
-)
-
-_face_cascade: Optional[cv2.CascadeClassifier] = None
-_eye_cascade: Optional[cv2.CascadeClassifier] = None
-_smile_cascade: Optional[cv2.CascadeClassifier] = None
+_face_mesh = None
 
 
-def _get_face_cascade() -> cv2.CascadeClassifier:
-    global _face_cascade
-    if _face_cascade is None:
-        path = os.path.join(_CASCADE_DIR, "haarcascade_frontalface_default.xml")
-        _face_cascade = cv2.CascadeClassifier(path)
-        if _face_cascade.empty():
-            logger.error(f"Failed to load face cascade from {path}")
-    return _face_cascade
+def get_face_mesh():
+    """Lazy singleton for MediaPipe Face Mesh."""
+    global _face_mesh
+    if _face_mesh is None:
+        _face_mesh = mp_face_mesh.FaceMesh(
+            static_image_mode=True,
+            max_num_faces=1,
+            refine_landmarks=True,
+            min_detection_confidence=0.5,
+        )
+    return _face_mesh
 
 
-def _get_eye_cascade() -> cv2.CascadeClassifier:
-    global _eye_cascade
-    if _eye_cascade is None:
-        path = os.path.join(_CASCADE_DIR, "haarcascade_eye.xml")
-        _eye_cascade = cv2.CascadeClassifier(path)
-        if _eye_cascade.empty():
-            logger.error(f"Failed to load eye cascade from {path}")
-    return _eye_cascade
+# ──────────────────────── Landmark helpers ────────────────────────────
+
+# Indices from the canonical 478-point Face Mesh
+LEFT_EYE_IDX = [33, 160, 158, 133, 153, 144]
+RIGHT_EYE_IDX = [362, 385, 387, 263, 373, 380]
+UPPER_LIP_IDX = [13]
+LOWER_LIP_IDX = [14]
+LEFT_LIP_IDX = [61]
+RIGHT_LIP_IDX = [291]
+NOSE_TIP_IDX = 1
 
 
-def _get_smile_cascade() -> cv2.CascadeClassifier:
-    global _smile_cascade
-    if _smile_cascade is None:
-        path = os.path.join(_CASCADE_DIR, "haarcascade_smile.xml")
-        _smile_cascade = cv2.CascadeClassifier(path)
-        if _smile_cascade.empty():
-            logger.error(f"Failed to load smile cascade from {path}")
-    return _smile_cascade
+def _dist(a, b):
+    return math.hypot(a.x - b.x, a.y - b.y)
 
 
-# ──────────────────────── Detection Functions ────────────────────────────
-
-def _detect_face(gray: np.ndarray) -> Optional[tuple]:
-    """Detect the largest face in the frame. Returns (x, y, w, h) or None."""
-    cascade = _get_face_cascade()
-    faces = cascade.detectMultiScale(
-        gray, scaleFactor=1.1, minNeighbors=5, minSize=(60, 60)
-    )
-    if len(faces) == 0:
-        return None
-    # Return largest face
-    return max(faces, key=lambda f: f[2] * f[3])
+def _ear(lm, indices):
+    """Eye Aspect Ratio – low value ≈ eye closed."""
+    p = [lm[i] for i in indices]
+    v1 = _dist(p[1], p[5])
+    v2 = _dist(p[2], p[4])
+    h = _dist(p[0], p[3])
+    return (v1 + v2) / (2.0 * h + 1e-6)
 
 
-def _detect_blink(gray: np.ndarray, face_rect: tuple) -> tuple[bool, float]:
-    """Detect blink by checking if eyes are NOT visible (closed).
-    
-    When eyes are closed, the eye cascade won't detect them.
-    Returns (is_blinking, confidence).
-    """
-    x, y, w, h = face_rect
-    # Focus on upper half of face (eye region)
-    eye_region = gray[y:y + h // 2, x:x + w]
-    
-    if eye_region.size == 0:
-        return False, 0.0
-    
-    cascade = _get_eye_cascade()
-    eyes = cascade.detectMultiScale(
-        eye_region, scaleFactor=1.1, minNeighbors=5, minSize=(20, 20)
-    )
-    
-    # No eyes detected = likely blinking
-    num_eyes = len(eyes)
-    if num_eyes == 0:
-        return True, 0.85
-    elif num_eyes == 1:
-        return True, 0.5  # Partial blink or one eye closed
-    else:
-        return False, 0.1
+def _smile_ratio(lm):
+    """Width / height of mouth – high value ≈ smiling."""
+    w = _dist(lm[LEFT_LIP_IDX[0]], lm[RIGHT_LIP_IDX[0]])
+    h = _dist(lm[UPPER_LIP_IDX[0]], lm[LOWER_LIP_IDX[0]])
+    return w / (h + 1e-6)
 
 
-def _detect_smile(gray: np.ndarray, face_rect: tuple) -> tuple[bool, float]:
-    """Detect smile using mouth/smile cascade on lower face region.
-    
-    Returns (is_smiling, confidence).
-    """
-    x, y, w, h = face_rect
-    # Focus on lower third of face (mouth region)
-    mouth_region = gray[y + 2 * h // 3:y + h, x:x + w]
-    
-    if mouth_region.size == 0:
-        return False, 0.0
-    
-    cascade = _get_smile_cascade()
-    smiles = cascade.detectMultiScale(
-        mouth_region, scaleFactor=1.7, minNeighbors=22, minSize=(25, 15)
-    )
-    
-    if len(smiles) > 0:
-        # Confidence based on how many smile detections
-        confidence = min(1.0, 0.5 + len(smiles) * 0.2)
-        return True, confidence
-    
-    return False, 0.0
+def _nose_offset(lm):
+    """Normalised horizontal nose position (0 = far left, 1 = far right)."""
+    return lm[NOSE_TIP_IDX].x
 
 
-def _detect_head_turn(gray: np.ndarray, face_rect: tuple, 
-                       frame_width: int) -> tuple[float, float]:
-    """Detect head turn direction based on face position in frame.
-    
-    Returns (turn_ratio, confidence) where:
-    - negative ratio = face is to the left (turned left)
-    - positive ratio = face is to the right (turned right)
-    """
-    x, y, w, h = face_rect
-    face_center_x = x + w / 2
-    frame_center_x = frame_width / 2
-    
-    # Normalized offset: -1.0 (far left) to +1.0 (far right)
-    offset = (face_center_x - frame_center_x) / (frame_width / 2)
-    
-    return offset, abs(offset)
-
-
-def detect_action(gray: np.ndarray, face_rect: tuple, 
-                  frame_width: int, action: str) -> tuple[bool, float]:
-    """Detect whether a specific action is being performed.
-    
-    Returns: (detected: bool, confidence: float 0-1)
-    """
-    if action == "blink":
-        return _detect_blink(gray, face_rect)
-    
-    elif action == "smile":
-        return _detect_smile(gray, face_rect)
-    
-    elif action == "turn_left":
-        offset, confidence = _detect_head_turn(gray, face_rect, frame_width)
-        # Face moved to the right side of frame = person turned head left
-        threshold = getattr(settings, 'HEAD_TURN_THRESHOLD', 0.15)
-        detected = offset > threshold
-        return detected, confidence if detected else 0.0
-    
-    elif action == "turn_right":
-        offset, confidence = _detect_head_turn(gray, face_rect, frame_width)
-        # Face moved to the left side of frame = person turned head right
-        threshold = getattr(settings, 'HEAD_TURN_THRESHOLD', 0.15)
-        detected = offset < -threshold
-        return detected, confidence if detected else 0.0
-    
-    return False, 0.0
-
-
-# ──────────────────────── Frame Processing ────────────────────────────
+# ────────────────────────── Frame decode ─────────────────────────────
 
 def decode_frame(base64_str: str) -> Optional[np.ndarray]:
     """Decode a base64-encoded image to an OpenCV frame, downscaled for speed."""
     try:
-        # Remove data URL prefix if present
         if "," in base64_str:
             base64_str = base64_str.split(",", 1)[1]
 
@@ -193,7 +90,6 @@ def decode_frame(base64_str: str) -> Optional[np.ndarray]:
         if frame is None:
             return None
 
-        # Downscale for speed
         h, w = frame.shape[:2]
         target_w = settings.FRAME_WIDTH
         if w > target_w:
@@ -206,112 +102,118 @@ def decode_frame(base64_str: str) -> Optional[np.ndarray]:
         return None
 
 
+# ────────────────────────── Action detection ─────────────────────────
+
+def detect_action(landmarks, action: str) -> tuple:
+    """Return (detected: bool, confidence: float) for a given action."""
+    lm = landmarks
+
+    if action == "blink":
+        left_ear = _ear(lm, LEFT_EYE_IDX)
+        right_ear = _ear(lm, RIGHT_EYE_IDX)
+        avg_ear = (left_ear + right_ear) / 2.0
+        threshold = getattr(settings, "BLINK_THRESHOLD", 0.21)
+        detected = avg_ear < threshold
+        confidence = max(0.0, 1.0 - avg_ear / threshold) if detected else 0.0
+        return detected, round(confidence, 3)
+
+    if action == "smile":
+        ratio = _smile_ratio(lm)
+        threshold = getattr(settings, "SMILE_THRESHOLD", 4.0)
+        detected = ratio > threshold
+        confidence = min(1.0, ratio / (threshold * 1.5)) if detected else 0.0
+        return detected, round(confidence, 3)
+
+    if action == "turn_left":
+        nx = _nose_offset(lm)
+        threshold = getattr(settings, "HEAD_TURN_THRESHOLD", 0.58)
+        detected = nx > threshold
+        confidence = min(1.0, (nx - 0.5) * 4) if detected else 0.0
+        return detected, round(max(confidence, 0.0), 3)
+
+    if action == "turn_right":
+        nx = _nose_offset(lm)
+        threshold = 1.0 - getattr(settings, "HEAD_TURN_THRESHOLD", 0.58)
+        detected = nx < threshold
+        confidence = min(1.0, (0.5 - nx) * 4) if detected else 0.0
+        return detected, round(max(confidence, 0.0), 3)
+
+    return False, 0.0
+
+
 # ──────────────────────── Main Analysis Pipeline ────────────────────────
 
 def analyze_frames(
     base64_frames: List[str],
     challenge_steps: List[str],
 ) -> Dict[str, Any]:
-    """Analyze a sequence of frames against challenge steps.
-    
-    Enforces temporal ordering: step N must be detected in frames
-    AFTER step N-1 was detected.
-    
-    Returns:
-        {
-            "passed": bool,
-            "liveness_score": float (0-100),
-            "step_results": [{"step": str, "detected": bool, "confidence": float, "frame_idx": int}],
-            "face_detected_count": int,
-            "total_frames": int,
-            "temporal_valid": bool,
-        }
+    """Analyse a sequence of frames against ordered challenge steps.
+
+    Returns dict with: passed, liveness_score, step_results,
+    face_detected_count, total_frames, temporal_valid.
     """
     total_frames = len(base64_frames)
     if total_frames == 0:
-        return {
-            "passed": False,
-            "liveness_score": 0.0,
-            "step_results": [],
-            "face_detected_count": 0,
-            "total_frames": 0,
-            "temporal_valid": False,
-            "error": "No frames provided",
-        }
+        return _fail("No frames provided")
 
-    # Track which step we're currently looking for
+    mesh = get_face_mesh()
     current_step_idx = 0
-    step_results = []
     face_detected_count = 0
-    consecutive_detection_count = 0
+    consec = 0
 
-    # Initialize step results
-    for step in challenge_steps:
-        step_results.append({
-            "step": step,
-            "detected": False,
-            "confidence": 0.0,
-            "frame_idx": -1,
-        })
+    step_results = [
+        {"step": s, "detected": False, "confidence": 0.0, "frame_idx": -1}
+        for s in challenge_steps
+    ]
 
-    # Process each frame
-    for frame_idx, b64_frame in enumerate(base64_frames):
-        # Early exit if all steps verified
+    for frame_idx, b64 in enumerate(base64_frames):
         if current_step_idx >= len(challenge_steps):
             break
 
-        frame = decode_frame(b64_frame)
+        frame = decode_frame(b64)
         if frame is None:
             continue
 
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        frame_height, frame_width = gray.shape[:2]
+        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        result = mesh.process(rgb)
 
-        # Detect face
-        face_rect = _detect_face(gray)
-        if face_rect is None:
-            consecutive_detection_count = 0
+        if not result.multi_face_landmarks:
+            consec = 0
             continue
 
         face_detected_count += 1
+        lm = result.multi_face_landmarks[0].landmark
 
-        # Check current step
-        current_step = challenge_steps[current_step_idx]
-        detected, confidence = detect_action(
-            gray, face_rect, frame_width, current_step
-        )
+        detected, confidence = detect_action(lm, challenge_steps[current_step_idx])
 
         if detected:
-            consecutive_detection_count += 1
-            min_frames = getattr(settings, 'MIN_CONSECUTIVE_FRAMES', 2)
-            if consecutive_detection_count >= min_frames:
+            consec += 1
+            min_frames = getattr(settings, "MIN_CONSECUTIVE_FRAMES", 2)
+            if consec >= min_frames:
                 step_results[current_step_idx]["detected"] = True
                 step_results[current_step_idx]["confidence"] = confidence
                 step_results[current_step_idx]["frame_idx"] = frame_idx
                 current_step_idx += 1
-                consecutive_detection_count = 0
+                consec = 0
         else:
-            consecutive_detection_count = 0
+            consec = 0
 
-    # Calculate results
     steps_passed = sum(1 for s in step_results if s["detected"])
     total_steps = len(challenge_steps)
 
-    # Temporal validity: steps must be detected in order
     temporal_valid = all(
         step_results[i]["frame_idx"] < step_results[i + 1]["frame_idx"]
         for i in range(steps_passed - 1)
         if step_results[i]["detected"] and step_results[i + 1]["detected"]
     ) if steps_passed > 1 else steps_passed > 0
 
-    # Liveness score computation
-    step_score = (steps_passed / total_steps) * 60 if total_steps > 0 else 0
-    face_ratio = (face_detected_count / total_frames) * 20 if total_frames > 0 else 0
-    avg_confidence = (
-        sum(s["confidence"] for s in step_results if s["detected"]) / max(steps_passed, 1)
+    step_score = (steps_passed / total_steps) * 60 if total_steps else 0
+    face_ratio = (face_detected_count / total_frames) * 20
+    avg_conf = (
+        sum(s["confidence"] for s in step_results if s["detected"])
+        / max(steps_passed, 1)
     ) * 20
-
-    liveness_score = round(min(100.0, step_score + face_ratio + avg_confidence), 1)
+    liveness_score = round(min(100.0, step_score + face_ratio + avg_conf), 1)
 
     passed = steps_passed == total_steps and temporal_valid and liveness_score >= 60.0
 
@@ -322,4 +224,16 @@ def analyze_frames(
         "face_detected_count": face_detected_count,
         "total_frames": total_frames,
         "temporal_valid": temporal_valid,
+    }
+
+
+def _fail(reason: str) -> Dict[str, Any]:
+    return {
+        "passed": False,
+        "liveness_score": 0.0,
+        "step_results": [],
+        "face_detected_count": 0,
+        "total_frames": 0,
+        "temporal_valid": False,
+        "error": reason,
     }

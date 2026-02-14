@@ -5,6 +5,12 @@ asyncpg
 alembic
 pydantic-settings
 python-jose[cryptography]
-opencv-python-headless
-numpy
 python-multipart
+# ── CV / ML ──
+mediapipe==0.10.14
+opencv-contrib-python-headless
+numpy
+protobuf>=4.25.3,<5
+absl-py
+attrs>=19.1.0
+flatbuffers>=2.0
